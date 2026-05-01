@@ -1,0 +1,38 @@
+name: Telegram Bot Subs Manager
+
+on:
+  schedule:
+    - cron: '*/5 * * * *' # Запускати кожні 5 хвилин
+  workflow_dispatch: # Дозволяє запускати вручну з вкладки Actions
+
+permissions:
+  contents: write
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run Telegram Bot
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          ADMIN_CHAT_ID: ${{ secrets.ADMIN_CHAT_ID }}
+        run: python bot.py
+
+      - name: Commit and Push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add values.json .bot_offset
+          # Зробить коміт тільки якщо є зміни (git diff)
+          git diff --quiet && git diff --staged --quiet || (git commit -m "bot: updated subscription date via Telegram [skip ci]" && git push)
