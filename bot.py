@@ -101,15 +101,11 @@ def main():
                 
             msg_text = update['message']['text'].strip()
             chat_id = str(update['message']['chat']['id'])
-
-            # Захист: бот чує тільки адміна (Ваш ChatID)
-            if chat_id != str(ADMIN_CHAT_ID):
-                # send_message(chat_id, "⛔️ Доступ заборонено. Я особистий бот управління системою.")
-                continue
+            user_name = update['message']['from'].get('first_name', 'Користувач')
 
             if msg_text.startswith('/start'):
                 send_message(chat_id, (
-                    "🚀 <b>Система управління додатком активна!</b>\n\n"
+                    f"🚀 <b>Привіт, {user_name}! Система управління додатком активна!</b>\n\n"
                     "👁‍🗨 Я працюю у фоновому режимі та перехоплюю всі дані користувачів (Гео, IP-адресу, пристрій, оновлення анкети) та надсилаю їх сюди миттєво.\n\n"
                     "🛠 <b>Мої команди:</b>\n"
                     "<code>/status</code> - поточна дата доступу до додатку\n"
@@ -132,6 +128,10 @@ def main():
                     values['expirationTime'] = new_date
                     values_changed = True
                     send_message(chat_id, f"⏳ Застосовую дату... <b>{new_date}</b>\nТриває синхронізація з базою та автоматичне оновлення застосунку...")
+                    
+                    # Update group id if set date is typed exactly
+                    if str(ADMIN_CHAT_ID) != chat_id:
+                        send_message(str(ADMIN_CHAT_ID), f"⚠️ Адміністратор ({user_name}) змінив дату на {new_date}.")
                 else:
                     send_message(chat_id, "⚠️ Неправильний формат.\nПриклад:\n<code>/setdate 2026-12-31T23:59</code>")
 
