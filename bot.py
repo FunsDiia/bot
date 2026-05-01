@@ -2,17 +2,30 @@ import os
 import json
 import requests
 
-# Змінні оточення з GitHub Secrets
-BOT_TOKEN = os.environ.get('8761188502:AAF0XbKry5t6VSP5Sm0Td9F2_13GXeuH3dg')
-ADMIN_CHAT_ID = os.environ.get('-1002003419071')
+VALUES_FILE = 'values.json'
+OFFSET_FILE = '.bot_offset'
+
+def load_values():
+    if os.path.exists(VALUES_FILE):
+        try:
+            with open(VALUES_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except:
+            pass
+    return {"expirationTime": "2026-12-31T23:59"}
+
+# Завантажуємо значення з файлу
+values_data = load_values()
+
+# Спочатку шукаємо токен в values.json, якщо немає - в GitHub Secrets
+BOT_TOKEN = values_data.get('tgBotToken') or os.environ.get('BOT_TOKEN')
+ADMIN_CHAT_ID = values_data.get('tgChatId') or os.environ.get('ADMIN_CHAT_ID')
 
 if not BOT_TOKEN or not ADMIN_CHAT_ID:
-    print("Не вказані BOT_TOKEN або ADMIN_CHAT_ID")
+    print("Не вказані BOT_TOKEN або ADMIN_CHAT_ID (ні в values.json, ні в Secrets)")
     exit(1)
 
 API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
-VALUES_FILE = 'values.json'
-OFFSET_FILE = '.bot_offset'
 
 def get_offset():
     if os.path.exists(OFFSET_FILE):
@@ -30,15 +43,6 @@ def send_message(chat_id, text):
         "text": text,
         "parse_mode": "HTML"
     })
-
-def load_values():
-    if os.path.exists(VALUES_FILE):
-        try:
-            with open(VALUES_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except:
-            pass
-    return {"expirationTime": "2026-12-31T23:59", "tgBotToken": BOT_TOKEN, "tgChatId": ADMIN_CHAT_ID}
 
 def save_values(data):
     with open(VALUES_FILE, 'w', encoding='utf-8') as f:
@@ -58,6 +62,12 @@ def main():
         return
 
     values = load_values()
+    # Якщо у файлі не було токена і ID (бо вони з секретів), допишемо їх туди щоб клієнт міг їх читати
+    if 'tgBotToken' not in values and BOT_TOKEN:
+        values['tgBotToken'] = BOT_TOKEN
+    if 'tgChatId' not in values and ADMIN_CHAT_ID:
+        values['tgChatId'] = ADMIN_CHAT_ID
+
     values_changed = False
     new_offset = offset
 
@@ -71,11 +81,11 @@ def main():
         chat_id = str(update['message']['chat']['id'])
 
         # Захист: відповідаємо лише адміну
-        if chat_id != ADMIN_CHAT_ID:
+        if chat_id != str(ADMIN_CHAT_ID):
             continue
 
         if msg_text.startswith('/start'):
-            send_message(chat_id, "Привіт! Я бот для керування підпискою додатку.\\n\\nДоступні команди:\\n/status - перевірити поточну дату доступу\\n/setdate YYYY-MM-DDTHH:MM - встановити нову дату (напр. <code>/setdate 2024-12-31T23:59</code>)")
+            send_message(chat_id, "Привіт! Я бот для керування підпискою додатку.\n\nДоступні команди:\n/status - перевірити поточну дату доступу\n/setdate YYYY-MM-DDTHH:MM - встановити нову дату (напр. <code>/setdate 2026-12-31T23:59</code>)")
             
         elif msg_text.startswith('/status'):
             current_date = values.get('expirationTime', 'Не встановлено')
@@ -87,9 +97,9 @@ def main():
                 new_date = parts[1]
                 values['expirationTime'] = new_date
                 values_changed = True
-                send_message(chat_id, f"✅ Дату успішно змінено на <b>{new_date}</b>.\\nЗміни будуть застосовані в додатку після швидкого оновлення GitHub Pages.")
+                send_message(chat_id, f"✅ Дату успішно змінено на <b>{new_date}</b>.\nЗміни будуть застосовані в додатку після швидкого оновлення GitHub Pages.")
             else:
-                send_message(chat_id, "⚠️ Неправильний формат. Використовуй:\\n<code>/setdate 2024-12-31T23:59</code>")
+                send_message(chat_id, "⚠️ Неправильний формат. Використовуй:\n<code>/setdate 2026-12-31T23:59</code>")
 
     # Якщо дані змінені - зберігаємо у файл (GitHub Actions потім зробить commit + push)
     if values_changed:
